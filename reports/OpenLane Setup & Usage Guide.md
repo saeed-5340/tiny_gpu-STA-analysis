@@ -229,12 +229,12 @@ head -5 /tiny_gpu-STA-analysis/sta_work/gpu_flat.v
 
 Create the synthesis script:
 
-# Create synth_gpu.ys — the Yosys synthesis script
-# Step 1: Read the flat Verilog file
-# Step 2: Synthesize, setting 'gpu' as the top module
-# Step 3: Map flip-flops to sky130 DFF cells
-# Step 4: Map combinational logic to sky130 cells (with optimization)
-# Step 5: Write gate-level netlist
+1. Create synth_gpu.ys — the Yosys synthesis script
+2. Step 1: Read the flat Verilog file
+3. Step 2: Synthesize, setting 'gpu' as the top module
+4. Step 3: Map flip-flops to sky130 DFF cells
+5. Step 4: Map combinational logic to sky130 cells (with optimization)
+6. Step 5: Write gate-level netlist
 
 ```bash
 read_verilog /tiny_gpu-STA-analysis/sta_work/gpu_flat.v 
@@ -243,7 +243,7 @@ dfflibmap -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd_
 abc -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib 
 write_verilog -noattr /tiny_gpu-STA-analysis/sta_work/gpu_netlist.v
 ```
-Code is given [/tiny_gpu-STA-analysis/sta_work/synth_gpu.ys]
+Code is given ```/tiny_gpu-STA-analysis/sta_work/synth_gpu.ys```
 
 Run synthesis:
 
@@ -265,13 +265,19 @@ set_input_delay  2.0 -clock clk [all_inputs]
 set_output_delay 2.0 -clock clk [all_outputs]
 EOF
 ```
-Code is given [/tiny_gpu-STA-analysis/sta_work/gpu_tt.sdc]
+Code is given ```/tiny_gpu-STA-analysis/sta_work/gpu_tt.sdc```
 This sets a 100 MHz clock (10 ns period) with 2 ns I/O delays.
 
 ### Phase 5 — Write OpenSTA script 
 OpenSTA script is written in:
-[tiny_gpu-STA-analysis/sta_work/run_sta_gpu_tt.tcl]
-[tiny_gpu-STA-analysis/sta_work/run_sta_gpu_ss.tcl]
+
+```
+/tiny_gpu-STA-analysis/sta_work/run_sta_gpu_tt.tcl
+```
+
+```
+/tiny_gpu-STA-analysis/sta_work/run_sta_gpu_ss.tcl
+```
 
 
 ### Phase 6 — Run OpenSTA and generate the timing report
