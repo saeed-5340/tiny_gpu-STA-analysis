@@ -194,34 +194,34 @@ docker run hello-world
 
 ## Running the STA Flow (tiny-GPU example)
 
-This section walks through producing `gpu_tt.txt` — the TT-corner timing report for the [tiny-GPU](https://github.com/adam-maj/tiny-gpu) design.
+This section walks through producing `gpu_tt.txt` and `gpu_ss.txt`.
 
 ### Setup — Create working directory
 
 ```bash
-mkdir -p /mnt/openlane_disk/sta_work
-cd /mnt/openlane_disk/sta_work
+mkdir -p /tiny_gpu-STA-analysis/sta_work
+cd /tiny_gpu-STA-analysis/sta_work
 ```
+(If you clone this repo you don't need to create working directory.
 
 ### Phase 1 — Clone the design
 
 ```bash
-cd /mnt/openlane_disk
-git clone https://github.com/adam-maj/tiny-gpu.git
-# RTL files are in: /mnt/openlane_disk/tiny-gpu/src/
+git clone https://github.com/saeed-5340/tiny_gpu-STA-analysis.git
+# RTL files are in: /tiny_gpu-STA-analysis/src/
 # Top module: gpu   |   Clock port: clk
 ```
 
 ### Phase 2 — Convert SystemVerilog → Verilog (sv2v)
 
 ```bash
-/mnt/openlane_disk/sv2v/bin/sv2v \
-  /mnt/openlane_disk/tiny-gpu/src/*.sv \
-  > /mnt/openlane_disk/sta_work/gpu_flat.v 2>&1
+/sv2v/bin/sv2v \
+ /tiny_gpu-STA-analysis/src/*.sv \
+  > tiny_gpu-STA-analysis/sta_work/gpu_flat.v 2>&1
 
 # Verify output
-wc -l /mnt/openlane_disk/sta_work/gpu_flat.v
-head -5 /mnt/openlane_disk/sta_work/gpu_flat.v
+wc -l /tiny_gpu-STA-analysis/sta_work/gpu_flat.v
+head -5 /tiny_gpu-STA-analysis/sta_work/gpu_flat.v
 # Expected: ~1265 lines of real Verilog code
 ```
 
@@ -229,63 +229,66 @@ head -5 /mnt/openlane_disk/sta_work/gpu_flat.v
 
 Create the synthesis script:
 
+# Create synth_gpu.ys — the Yosys synthesis script
+# Step 1: Read the flat Verilog file
+# Step 2: Synthesize, setting 'gpu' as the top module
+# Step 3: Map flip-flops to sky130 DFF cells
+# Step 4: Map combinational logic to sky130 cells (with optimization)
+# Step 5: Write gate-level netlist
+
 ```bash
-cat > /mnt/openlane_disk/sta_work/synth_gpu.ys << 'EOF'
-read_verilog /mnt/openlane_disk/sta_work/gpu_flat.v
-synth -top gpu -flatten
-dfflibmap -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib
-abc -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib
-write_verilog -noattr /mnt/openlane_disk/sta_work/gpu_netlist.v
-EOF
+read_verilog /tiny_gpu-STA-analysis/sta_work/gpu_flat.v 
+synth -top gpu
+dfflibmap -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib 
+abc -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib 
+write_verilog -noattr /tiny_gpu-STA-analysis/sta_work/gpu_netlist.v
 ```
+Code is given [/tiny_gpu-STA-analysis/sta_work/synth_gpu.ys]
 
 Run synthesis:
 
 ```bash
-yosys /mnt/openlane_disk/sta_work/synth_gpu.ys 2>&1 | tee yosys_gpu.log | tail -15
+yosys /tiny_gpu-STA-analysis/sta_work/synth_gpu.ys 2>&1 | tee /tiny_gpu-STA-analysis/sta_work/yosys_gpu.log | tail -15
 # Expected: "End of script." with CPU/MEM stats — no errors
 
 # Verify netlist
-wc -l /mnt/openlane_disk/sta_work/gpu_netlist.v
+wc -l /tiny_gpu-STA-analysis/sta_work/gpu_netlist.v
 # Expected: ~118,000 lines of gate-level Verilog
 ```
 
 ### Phase 4 — Create SDC constraint file
 
 ```bash
-cat > /mnt/openlane_disk/sta_work/gpu_tt.sdc << 'EOF'
+cat > /tiny_gpu-STA-analysis/sta_work/sta_work/gpu_tt.sdc << 'EOF'
 create_clock -name clk -period 10.0 [get_ports clk]
 set_input_delay  2.0 -clock clk [all_inputs]
 set_output_delay 2.0 -clock clk [all_outputs]
 EOF
 ```
-
+Code is given [/tiny_gpu-STA-analysis/sta_work/gpu_tt.sdc]
 This sets a 100 MHz clock (10 ns period) with 2 ns I/O delays.
 
-### Phase 5 — Write OpenSTA script
+### Phase 5 — Write OpenSTA script 
+OpenSTA script is written in:
+[tiny_gpu-STA-analysis/sta_work/run_sta_gpu_tt.tcl]
+[tiny_gpu-STA-analysis/sta_work/run_sta_gpu_ss.tcl]
 
-```bash
-cat > /mnt/openlane_disk/sta_work/run_sta_gpu_tt.tcl << 'EOF'
-read_liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib
-read_verilog /mnt/openlane_disk/sta_work/gpu_netlist.v
-link_design gpu
-read_sdc /mnt/openlane_disk/sta_work/gpu_tt.sdc
-report_checks -path_delay max -format full -digits 3 -slack_less_than 0.0
-report_wns
-report_tns
-exit
-EOF
-```
 
 ### Phase 6 — Run OpenSTA and generate the timing report
 
 ```bash
-sta /mnt/openlane_disk/sta_work/run_sta_gpu_tt.tcl 2>&1 | tee /mnt/openlane_disk/sta_work/gpu_tt.txt | tail -40
+sta /tiny_gpu-STA-analysis/sta_work/run_sta_gpu_tt.tcl 2>&1 | tee /tiny_gpu-STA-analysis/sta_work/gpu_tt.txt | tail -40
+```
+```bash
+sta /tiny_gpu-STA-analysis/sta_work/run_sta_gpu_ss.tcl 2>&1 | tee /tiny_gpu-STA-analysis/sta_work/gpu_ss.txt | tail -40
 ```
 
 The final timing report is saved at:
 ```
-/mnt/openlane_disk/sta_work/gpu_tt.txt
+/tiny_gpu-STA-analysis/sta_work/gpu_tt.txt
+```
+```
+/tiny_gpu-STA-analysis/sta_work/gpu_ss.txt
 ```
 
 ---
@@ -338,7 +341,7 @@ The final timing report is saved at:
 
 ## Next Steps
 
-After `gpu_tt.txt` is confirmed working:
+After `gpu_tt.txt` and `gpu_ss.txt` is confirmed working:
 
 1. **SS corner report** — rerun with `ss_100C_1v60.lib` and change SDC clock period to `12.0`
 2. **ibex design** — resolve vendor library dependencies, then run the same sv2v → Yosys → OpenSTA flow
