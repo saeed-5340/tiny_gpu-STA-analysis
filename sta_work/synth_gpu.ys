@@ -1,0 +1,12 @@
+# Create synth_gpu.ys — the Yosys synthesis script
+# Step 1: Read the flat Verilog file
+# Step 2: Synthesize, setting 'gpu' as the top module
+# Step 3: Map flip-flops to sky130 DFF cells
+# Step 4: Map combinational logic to sky130 cells (with optimization)
+# Step 5: Write gate-level netlist
+
+read_verilog /mnt/openlane_disk/tiny_gpu-STA-analysis/sta_work/gpu_flat.v 
+synth -top gpu
+dfflibmap -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib 
+abc -liberty ~/.ciel/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib 
+write_verilog -noattr /mnt/openlane_disk/tiny_gpu-STA-analysis/sta_work/gpu_netlist.v
